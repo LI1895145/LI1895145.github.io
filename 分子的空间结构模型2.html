@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分子空间结构学习游戏（高中人教版）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#8B5CF6',
+                        danger: '#EF4444',
+                        neutral: '#64748B',
+                        light: '#F1F5F9',
+                        dark: '#1E293B'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .molecule-container {
+                perspective: 1000px;
+            }
+            .molecule-3d {
+                transform-style: preserve-3d;
+                transition: transform 0.5s;
+            }
+            .card-flip {
+                transform: rotateY(180deg);
+            }
+            .card-front, .card-back {
+                backface-visibility: hidden;
+            }
+            .card-back {
+                transform: rotateY(180deg);
+            }
+            .input-focus {
+                @apply focus:ring-2 focus:ring-primary/50 focus:border-primary focus:outline-none;
+            }
+            .btn-hover {
+                @apply hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen font-sans text-dark">
+    <!-- 页面头部 -->
+    <header class="bg-white/80 backdrop-blur-sm shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center gap-2 mb-3 md:mb-0">
+                <i class="fa fa-cubes text-primary text-2xl"></i>
+                <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-primary">分子空间结构学习游戏</h1>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2">
+                    <i class="fa fa-trophy text-yellow-500"></i>
+                    <span class="font-semibold">得分: <span id="score" class="text-accent">0</span></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa fa-question-circle text-neutral"></i>
+                    <span class="font-semibold">题目: <span id="question-count">0</span>/<span id="total-questions">0</span></span>
+                </div>
+                <button id="help-btn" class="bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg flex items-center gap-1 btn-hover">
+                    <i class="fa fa-info-circle"></i>
+                    <span>帮助</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 游戏说明卡片 -->
+        <div id="instructions" class="bg-white rounded-xl shadow-lg p-6 mb-8 transform transition-all duration-500">
+            <h2 class="text-2xl font-bold mb-4 text-primary flex items-center">
+                <i class="fa fa-book mr-2"></i>游戏说明
+            </h2>
+            <p class="mb-4 text-neutral">在这个游戏中，你需要按照高中人教版教材的方法，先计算孤电子对数，再计算价层电子对，判断其VP模型和分子的空间结构，并确定其杂化方式。</p>
+            <ul class="list-disc pl-6 space-y-2 text-neutral">
+                <li>根据显示的分子，填写相应的计算结果</li>
+                <li>提交答案后可以查看详细的计算过程</li>
+                <li>每答对一题获得10分，答错不扣分</li>
+                <li>完成所有题目后可以查看你的总得分和正确率</li>
+            </ul>
+            <button id="start-btn" class="mt-6 bg-primary text-white px-6 py-3 rounded-lg font-semibold btn-hover w-full md:w-auto">
+                开始游戏 <i class="fa fa-play ml-1"></i>
+            </button>
+        </div>
+
+        <!-- 游戏区域 (初始隐藏) -->
+        <div id="game-area" class="hidden">
+            <!-- 分子显示卡片 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-xl font-bold mb-4 text-primary">当前分子: <span id="molecule-name" class="text-accent"></span></h2>
+                
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <!-- 分子结构示意图 -->
+                    <div class="molecule-container w-full md:w-1/3 aspect-square flex items-center justify-center">
+                        <div id="molecule-3d" class="molecule-3d relative w-full h-full">
+                            <!-- 分子结构将通过JS动态生成 -->
+                            <div id="molecule-structure" class="w-full h-full flex items-center justify-center">
+                                <!-- 中心原子 -->
+                                <div id="central-atom" class="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl shadow-lg z-10">
+                                    C
+                                </div>
+                                
+                                <!-- 配体原子将通过JS动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 分子信息 -->
+                    <div class="w-full md:w-2/3">
+                        <div class="bg-light rounded-lg p-4 mb-4">
+                            <h3 class="font-semibold mb-2 text-dark">分子信息</h3>
+                            <p><span class="font-medium">中心原子:</span> <span id="central-atom-info"></span> (价电子数a: <span id="valence-electrons"></span>)</p>
+                            <p><span class="font-medium">配体原子:</span> <span id="ligands-info"></span> (x: <span id="x-value"></span>)</p>
+                            <p><span class="font-medium">配体价电子数:</span> <span id="ligand-valence-electrons"></span></p>
+                            <p><span class="font-medium">配体提供电子数(b):</span> <span id="b-value"></span> (8-配体价电子数)</p>
+                            <p><span class="font-medium">电荷:</span> <span id="charge-info"></span></p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-light rounded-lg p-4">
+                                <h3 class="font-semibold mb-2 text-dark">人教版计算公式</h3>
+                                <p>孤电子对数 = 1/2 × (a - xb ± 电荷数)</p>
+                                <p class="mt-2">价层电子对数 = 孤电子对数 + 配体原子数(x)</p>
+                            </div>
+                            
+                            <div class="bg-light rounded-lg p-4">
+                                <h3 class="font-semibold mb-2 text-dark">配体电子数规则(b值)</h3>
+                                <p class="text-sm mb-2">根据人教版教材：b = 8 - 配体原子的价电子数</p>
+                                <ul class="list-disc pl-5 text-sm" id="hints-list">
+                                    <li>H: 价电子数=1 → b=1 (特殊处理)</li>
+                                    <li>卤素(Cl, F等): 价电子数=7 → b=1</li>
+                                    <li>O族(O, S等): 价电子数=6 → b=2</li>
+                                    <li>N族(N, P等): 价电子数=5 → b=3</li>
+                                    <li>阳离子减电荷数，阴离子加电荷数</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 答题区域 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-xl font-bold mb-6 text-primary">请回答以下问题</h2>
+                
+                <form id="answer-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="lone-pairs" class="block text-sm font-medium text-neutral mb-1">1. 孤电子对数</label>
+                            <input type="number" id="lone-pairs" min="0" max="4" step="1" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus">
+                        </div>
+                        
+                        <div>
+                            <label for="valence-pairs" class="block text-sm font-medium text-neutral mb-1">2. 价层电子对数</label>
+                            <input type="number" id="valence-pairs" min="2" max="4" step="1" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus">
+                        </div>
+                        
+                        <div>
+                            <label for="vp-model" class="block text-sm font-medium text-neutral mb-1">3. VP模型</label>
+                            <select id="vp-model" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus">
+                                <option value="">请选择...</option>
+                                <option value="直线形">直线形</option>
+                                <option value="平面三角形">平面三角形</option>
+                                <option value="四面体">四面体</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="molecular-shape" class="block text-sm font-medium text-neutral mb-1">4. 分子空间结构</label>
+                            <select id="molecular-shape" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus">
+                                <option value="">请选择...</option>
+                                <option value="直线形">直线形</option>
+                                <option value="平面三角形">平面三角形</option>
+                                <option value="V形">V形</option>
+                                <option value="四面体">四面体</option>
+                                <option value="三角锥形">三角锥形</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="hybridization" class="block text-sm font-medium text-neutral mb-1">5. 杂化方式</label>
+                            <select id="hybridization" class="w-full px-4 py-2 border border-gray-300 rounded-lg input-focus">
+                                <option value="">请选择...</option>
+                                <option value="sp">sp</option>
+                                <option value="sp²">sp²</option>
+                                <option value="sp³">sp³</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-4 pt-4 border-t border-gray-100">
+                        <button type="button" id="hint-btn" class="bg-neutral/10 text-neutral px-6 py-2 rounded-lg btn-hover">
+                            <i class="fa fa-lightbulb-o mr-1"></i> 提示
+                        </button>
+                        <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg font-medium btn-hover">
+                            提交答案 <i class="fa fa-check ml-1"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- 答案解析区域 (初始隐藏) -->
+            <div id="explanation-area" class="hidden bg-white rounded-xl shadow-lg p-6 mb-8">
+                <div id="correct-feedback" class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 hidden">
+                    <div class="flex items-center">
+                        <i class="fa fa-check-circle text-green-500 text-xl mr-2"></i>
+                        <h3 class="font-bold text-green-700">恭喜！你的答案完全正确！</h3>
+                    </div>
+                    <p class="mt-2 text-green-600">+10 分</p>
+                </div>
+                
+                <div id="partial-feedback" class="mb-6 p-4 rounded-lg bg-yellow-50 border border-yellow-200 hidden">
+                    <div class="flex items-center">
+                        <i class="fa fa-exclamation-circle text-yellow-500 text-xl mr-2"></i>
+                        <h3 class="font-bold text-yellow-700">部分正确</h3>
+                    </div>
+                    <p class="mt-2 text-yellow-600" id="partial-correct-count"></p>
+                </div>
+                
+                <div id="incorrect-feedback" class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 hidden">
+                    <div class="flex items-center">
+                        <i class="fa fa-times-circle text-red-500 text-xl mr-2"></i>
+                        <h3 class="font-bold text-red-700">答案不正确</h3>
+                    </div>
+                    <p class="mt-2 text-red-600">再试一次，你能做到的！</p>
+                </div>
+                
+                <h3 class="text-xl font-bold mb-4 text-accent">正确答案与解析（高中人教版）</h3>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="font-semibold text-dark mb-2">1. 配体提供电子数(b)计算</h4>
+                        <div id="b-calculation" class="bg-light p-4 rounded-lg text-neutral">
+                            <!-- 计算过程将通过JS动态生成 -->
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-dark mb-2">2. 孤电子对数计算过程</h4>
+                        <div id="lone-pairs-calculation" class="bg-light p-4 rounded-lg text-neutral">
+                            <!-- 计算过程将通过JS动态生成 -->
+                        </div>
+                        <p class="mt-2 font-medium">孤电子对数 = <span id="correct-lone-pairs" class="text-primary font-bold"></span></p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-dark mb-2">3. 价层电子对数计算过程</h4>
+                        <div id="valence-pairs-calculation" class="bg-light p-4 rounded-lg text-neutral">
+                            <!-- 计算过程将通过JS动态生成 -->
+                        </div>
+                        <p class="mt-2 font-medium">价层电子对数 = <span id="correct-valence-pairs" class="text-primary font-bold"></span></p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-dark mb-2">4. VP模型</h4>
+                            <p id="correct-vp-model" class="bg-light p-3 rounded-lg text-primary font-medium"></p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-dark mb-2">5. 分子空间结构</h4>
+                            <p id="correct-molecular-shape" class="bg-light p-3 rounded-lg text-primary font-medium"></p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-dark mb-2">6. 杂化方式</h4>
+                            <p id="correct-hybridization" class="bg-light p-3 rounded-lg text-primary font-medium"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 flex justify-end">
+                    <button id="next-btn" class="bg-secondary text-white px-6 py-2 rounded-lg font-medium btn-hover">
+                        下一个分子 <i class="fa fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 游戏结束区域 (初始隐藏) -->
+        <div id="game-over" class="hidden bg-white rounded-xl shadow-lg p-8 text-center">
+            <div class="mb-6 inline-block p-4 rounded-full bg-primary/10">
+                <i class="fa fa-trophy text-5xl text-primary"></i>
+            </div>
+            
+            <h2 class="text-3xl font-bold mb-2 text-primary">游戏结束！</h2>
+            <p class="text-neutral mb-6">恭喜你完成了所有分子结构的练习</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-light p-4 rounded-lg">
+                    <p class="text-neutral mb-1">总题目数</p>
+                    <p id="final-total" class="text-2xl font-bold text-dark">0</p>
+                </div>
+                
+                <div class="bg-light p-4 rounded-lg">
+                    <p class="text-neutral mb-1">正确题数</p>
+                    <p id="final-correct" class="text-2xl font-bold text-secondary">0</p>
+                </div>
+                
+                <div class="bg-light p-4 rounded-lg">
+                    <p class="text-neutral mb-1">总得分</p>
+                    <p id="final-score" class="text-2xl font-bold text-accent">0</p>
+                </div>
+            </div>
+            
+            <button id="restart-btn" class="bg-primary text-white px-8 py-3 rounded-lg font-semibold btn-hover">
+                重新开始 <i class="fa fa-refresh ml-1"></i>
+            </button>
+        </div>
+    </main>
+
+    <!-- 帮助模态框 (初始隐藏) -->
+    <div id="help-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-100">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-primary">游戏帮助（高中人教版）</h3>
+                    <button id="close-help" class="text-neutral hover:text-dark">
+                        <i class="fa fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <h4 class="font-semibold text-dark mb-2">配体电子数计算（人教版核心规则）</h4>
+                    <p>配体提供电子数(b) = 8 - 配体原子的价电子数</p>
+                    <p class="mt-2">特殊情况：H原子的b值为1（因H达到2电子稳定结构）</p>
+                    <table class="w-full border-collapse text-sm mt-2">
+                        <thead>
+                            <tr class="bg-light">
+                                <th class="border border-gray-200 p-2 text-left">配体原子</th>
+                                <th class="border border-gray-200 p-2 text-left">价电子数</th>
+                                <th class="border border-gray-200 p-2 text-left">b值(8-价电子数)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border border-gray-200 p-2">H</td>
+                                <td class="border border-gray-200 p-2">1</td>
+                                <td class="border border-gray-200 p-2">1（特殊处理）</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 p-2">卤素(F,Cl,Br,I)</td>
+                                <td class="border border-gray-200 p-2">7</td>
+                                <td class="border border-gray-200 p-2">1</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 p-2">O,S</td>
+                                <td class="border border-gray-200 p-2">6</td>
+                                <td class="border border-gray-200 p-2">2</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 p-2">N,P</td>
+                                <td class="border border-gray-200 p-2">5</td>
+                                <td class="border border-gray-200 p-2">3</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 p-2">C,Si</td>
+                                <td class="border border-gray-200 p-2">4</td>
+                                <td class="border border-gray-200 p-2">4</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold text-dark mb-2">孤电子对数计算（人教版核心公式）</h4>
+                    <p>孤电子对数 = 1/2 × (a - xb ± 电荷数)</p>
+                    <ul class="list-disc pl-5 mt-2 text-sm text-neutral">
+                        <li>a为中心原子的价电子数</li>
+                        <li>x为与中心原子结合的原子数</li>
+                        <li>b为配体提供的电子数（按上述规则计算）</li>
+                        <li>阳离子减去电荷数，阴离子加上电荷数</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold text-dark mb-2">价层电子对数计算</h4>
+                    <p>价层电子对数 = 孤电子对数 + 配体原子数(x)</p>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold text-dark mb-2">VP模型与价层电子对的关系</h4>
+                    <table class="w-full border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-light">
+                                <th class="border border-gray-200 p-2 text-left">价层电子对</th>
+                                <th class="border border-gray-200 p-2 text-left">VP模型</th>
+                                <th class="border border-gray-200 p-2 text-left">杂化方式</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border border-gray-200 p-2">2</td>
+                                <td class="border border-gray-200 p-2">直线形</td>
+                                <td class="border border-gray-200 p-2">sp</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 p-2">3</td>
+                                <td class="border border-gray-200 p-2">平面三角形</td>
+                                <td class="border border-gray-200 p-2">sp²</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 p-2">4</td>
+                                <td class="border border-gray-200 p-2">四面体</td>
+                                <td class="border border-gray-200 p-2">sp³</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold text-dark mb-2">分子空间结构与孤电子对的关系</h4>
+                    <table class="w-full border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-light">
+                                <th class="border border-gray-200 p-2 text-left">价层电子对</th>
+                                <th class="border border-gray-200 p-2 text-left">孤电子对数</th>
+                                <th class="border border-gray-200 p-2 text-left">分子空间结构</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border border-gray-200 p-2">2</td>
+                                <td class="border border-gray-200 p-2">0</td>
+                                <td class="border border-gray-200 p-2">直线形</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 p-2">3</td>
+                                <td class="border border-gray-200 p-2">0</td>
+                                <td class="border border-gray-200 p-2">平面三角形</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 p-2">3</td>
+                                <td class="border border-gray-200 p-2">1</td>
+                                <td class="border border-gray-200 p-2">V形</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 p-2">4</td>
+                                <td class="border border-gray-200 p-2">0</td>
+                                <td class="border border-gray-200 p-2">四面体</td>
+                            </tr>
+                            <tr>
+                                <td class="border border-gray-200 p-2">4</td>
+                                <td class="border border-gray-200 p-2">1</td>
+                                <td class="border border-gray-200 p-2">三角锥形</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="border border-gray-200 p-2">4</td>
+                                <td class="border border-gray-200 p-2">2</td>
+                                <td class="border border-gray-200 p-2">V形</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p>分子空间结构学习游戏（高中人教版）&copy; 2023</p>
+            <p class="text-gray-400 text-sm mt-1">高中化学辅助学习工具</p>
+        </div>
+    </footer>
+
+    <script>
+        // 元素价电子数参考表
+        const elementValenceElectrons = {
+            "H": 1,
+            "He": 2,
+            "Li": 1,
+            "Be": 2,
+            "B": 3,
+            "C": 4,
+            "N": 5,
+            "O": 6,
+            "F": 7,
+            "Ne": 8,
+            "Na": 1,
+            "Mg": 2,
+            "Al": 3,
+            "Si": 4,
+            "P": 5,
+            "S": 6,
+            "Cl": 7,
+            "Ar": 8,
+            "Br": 7,
+            "I": 7
+        };
+
+        // 分子数据模型（符合高中人教版要求，配体电子数=8-价电子数）
+        const molecules = [
+            {
+                name: "CH₄",
+                centralAtom: "C",
+                valenceElectrons: 4, // a值
+                ligand: { 
+                    symbol: "H", 
+                    valenceElectrons: 1, // 配体价电子数
+                    // 人教版配体电子数计算: H特殊处理为1（虽然8-1=7，但实际按1计算）
+                    electronsContributed: 1 
+                },
+                ligandCount: 4, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (4 - 4×1 + 0) = 0
+                // 价层电子对数 = 0 + 4 = 4
+                lonePairs: 0,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "四面体",
+                hybridization: "sp³"
+            },
+            {
+                name: "NH₃",
+                centralAtom: "N",
+                valenceElectrons: 5, // a值
+                ligand: { 
+                    symbol: "H", 
+                    valenceElectrons: 1,
+                    electronsContributed: 1 // H特殊处理
+                },
+                ligandCount: 3, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (5 - 3×1 + 0) = 1
+                // 价层电子对数 = 1 + 3 = 4
+                lonePairs: 1,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "三角锥形",
+                hybridization: "sp³"
+            },
+            {
+                name: "H₂O",
+                centralAtom: "O",
+                valenceElectrons: 6, // a值
+                ligand: { 
+                    symbol: "H", 
+                    valenceElectrons: 1,
+                    electronsContributed: 1 // H特殊处理
+                },
+                ligandCount: 2, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (6 - 2×1 + 0) = 2
+                // 价层电子对数 = 2 + 2 = 4
+                lonePairs: 2,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "V形",
+                hybridization: "sp³"
+            },
+            {
+                name: "BF₃",
+                centralAtom: "B",
+                valenceElectrons: 3, // a值
+                ligand: { 
+                    symbol: "F", 
+                    valenceElectrons: 7,
+                    electronsContributed: 1 // 8-7=1
+                },
+                ligandCount: 3, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (3 - 3×1 + 0) = 0
+                // 价层电子对数 = 0 + 3 = 3
+                lonePairs: 0,
+                valencePairs: 3,
+                vpModel: "平面三角形",
+                molecularShape: "平面三角形",
+                hybridization: "sp²"
+            },
+            {
+                name: "CO₂",
+                centralAtom: "C",
+                valenceElectrons: 4, // a值
+                ligand: { 
+                    symbol: "O", 
+                    valenceElectrons: 6,
+                    electronsContributed: 2 // 8-6=2
+                },
+                ligandCount: 2, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (4 - 2×2 + 0) = 0
+                // 价层电子对数 = 0 + 2 = 2
+                lonePairs: 0,
+                valencePairs: 2,
+                vpModel: "直线形",
+                molecularShape: "直线形",
+                hybridization: "sp"
+            },
+            {
+                name: "BeCl₂",
+                centralAtom: "Be",
+                valenceElectrons: 2, // a值
+                ligand: { 
+                    symbol: "Cl", 
+                    valenceElectrons: 7,
+                    electronsContributed: 1 // 8-7=1
+                },
+                ligandCount: 2, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (2 - 2×1 + 0) = 0
+                // 价层电子对数 = 0 + 2 = 2
+                lonePairs: 0,
+                valencePairs: 2,
+                vpModel: "直线形",
+                molecularShape: "直线形",
+                hybridization: "sp"
+            },
+            {
+                name: "SO₂",
+                centralAtom: "S",
+                valenceElectrons: 6, // a值
+                ligand: { 
+                    symbol: "O", 
+                    valenceElectrons: 6,
+                    electronsContributed: 2 // 8-6=2
+                },
+                ligandCount: 2, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (6 - 2×2 + 0) = 1
+                // 价层电子对数 = 1 + 2 = 3
+                lonePairs: 1,
+                valencePairs: 3,
+                vpModel: "平面三角形",
+                molecularShape: "V形",
+                hybridization: "sp²"
+            },
+            {
+                name: "NH₄⁺",
+                centralAtom: "N",
+                valenceElectrons: 5, // a值
+                ligand: { 
+                    symbol: "H", 
+                    valenceElectrons: 1,
+                    electronsContributed: 1 // H特殊处理
+                },
+                ligandCount: 4, // x值
+                charge: +1,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (5 - 4×1 - 1) = 0
+                // 价层电子对数 = 0 + 4 = 4
+                lonePairs: 0,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "四面体",
+                hybridization: "sp³"
+            },
+            {
+                name: "H₂S",
+                centralAtom: "S",
+                valenceElectrons: 6, // a值
+                ligand: { 
+                    symbol: "H", 
+                    valenceElectrons: 1,
+                    electronsContributed: 1 // H特殊处理
+                },
+                ligandCount: 2, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (6 - 2×1 + 0) = 2
+                // 价层电子对数 = 2 + 2 = 4
+                lonePairs: 2,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "V形",
+                hybridization: "sp³"
+            },
+            {
+                name: "PCl₃",
+                centralAtom: "P",
+                valenceElectrons: 5, // a值
+                ligand: { 
+                    symbol: "Cl", 
+                    valenceElectrons: 7,
+                    electronsContributed: 1 // 8-7=1
+                },
+                ligandCount: 3, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (5 - 3×1 + 0) = 1
+                // 价层电子对数 = 1 + 3 = 4
+                lonePairs: 1,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "三角锥形",
+                hybridization: "sp³"
+            },
+            {
+                name: "SO₃",
+                centralAtom: "S",
+                valenceElectrons: 6, // a值
+                ligand: { 
+                    symbol: "O", 
+                    valenceElectrons: 6,
+                    electronsContributed: 2 // 8-6=2
+                },
+                ligandCount: 3, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (6 - 3×2 + 0) = 0
+                // 价层电子对数 = 0 + 3 = 3
+                lonePairs: 0,
+                valencePairs: 3,
+                vpModel: "平面三角形",
+                molecularShape: "平面三角形",
+                hybridization: "sp²"
+            },
+            {
+                name: "CH₃Cl",
+                centralAtom: "C",
+                valenceElectrons: 4, // a值
+                ligand: { 
+                    symbol: "H/Cl", 
+                    valenceElectrons: "1/7",
+                    electronsContributed: 1 // H和Cl均为1
+                },
+                ligandCount: 4, // x值
+                charge: 0,
+                // 人教版计算: 
+                // 孤电子对数 = 1/2 × (4 - (3×1 + 1×1) + 0) = 0
+                // 价层电子对数 = 0 + 4 = 4
+                lonePairs: 0,
+                valencePairs: 4,
+                vpModel: "四面体",
+                molecularShape: "四面体",
+                hybridization: "sp³"
+            }
+        ];
+
+        // 游戏状态
+        let gameState = {
+            currentMoleculeIndex: -1,
+            usedMoleculeIndices: [],
+            score: 0,
+            totalQuestions: 0,
+            correctAnswers: 0
+        };
+
+        // DOM元素
+        const elements = {
+            instructions: document.getElementById('instructions'),
+            gameArea: document.getElementById('game-area'),
+            gameOver: document.getElementById('game-over'),
+            startBtn: document.getElementById('start-btn'),
+            restartBtn: document.getElementById('restart-btn'),
+            answerForm: document.getElementById('answer-form'),
+            explanationArea: document.getElementById('explanation-area'),
+            nextBtn: document.getElementById('next-btn'),
+            hintBtn: document.getElementById('hint-btn'),
+            helpBtn: document.getElementById('help-btn'),
+            helpModal: document.getElementById('help-modal'),
+            closeHelp: document.getElementById('close-help'),
+            scoreDisplay: document.getElementById('score'),
+            questionCount: document.getElementById('question-count'),
+            totalQuestions: document.getElementById('total-questions'),
+            moleculeName: document.getElementById('molecule-name'),
+            centralAtomInfo: document.getElementById('central-atom-info'),
+            valenceElectrons: document.getElementById('valence-electrons'),
+            ligandsInfo: document.getElementById('ligands-info'),
+            xValue: document.getElementById('x-value'),
+            ligandValenceElectrons: document.getElementById('ligand-valence-electrons'),
+            bValue: document.getElementById('b-value'),
+            chargeInfo: document.getElementById('charge-info'),
+            centralAtom: document.getElementById('central-atom'),
+            moleculeStructure: document.getElementById('molecule-structure'),
+            lonePairsInput: document.getElementById('lone-pairs'),
+            valencePairsInput: document.getElementById('valence-pairs'),
+            vpModelInput: document.getElementById('vp-model'),
+            molecularShapeInput: document.getElementById('molecular-shape'),
+            hybridizationInput: document.getElementById('hybridization'),
+            correctFeedback: document.getElementById('correct-feedback'),
+            partialFeedback: document.getElementById('partial-feedback'),
+            incorrectFeedback: document.getElementById('incorrect-feedback'),
+            partialCorrectCount: document.getElementById('partial-correct-count'),
+            bCalculation: document.getElementById('b-calculation'),
+            lonePairsCalculation: document.getElementById('lone-pairs-calculation'),
+            valencePairsCalculation: document.getElementById('valence-pairs-calculation'),
+            correctLonePairs: document.getElementById('correct-lone-pairs'),
+            correctValencePairs: document.getElementById('correct-valence-pairs'),
+            correctVpModel: document.getElementById('correct-vp-model'),
+            correctMolecularShape: document.getElementById('correct-molecular-shape'),
+            correctHybridization: document.getElementById('correct-hybridization'),
+            finalTotal: document.getElementById('final-total'),
+            finalCorrect: document.getElementById('final-correct'),
+            finalScore: document.getElementById('final-score')
+        };
+
+        // 初始化游戏
+        function initGame() {
+            gameState = {
+                currentMoleculeIndex: -1,
+                usedMoleculeIndices: [],
+                score: 0,
+                totalQuestions: molecules.length,
+                correctAnswers: 0
+            };
+            
+            updateScoreDisplay();
+            elements.instructions.classList.remove('hidden');
+            elements.gameArea.classList.add('hidden');
+            elements.gameOver.classList.add('hidden');
+        }
+
+        // 更新分数显示
+        function updateScoreDisplay() {
+            elements.scoreDisplay.textContent = gameState.score;
+            elements.questionCount.textContent = gameState.usedMoleculeIndices.length;
+            elements.totalQuestions.textContent = gameState.totalQuestions;
+        }
+
+        // 获取下一个随机分子
+        function getNextMolecule() {
+            // 如果所有分子都已使用，游戏结束
+            if (gameState.usedMoleculeIndices.length >= molecules.length) {
+                endGame();
+                return null;
+            }
+            
+            // 随机选择一个未使用的分子
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * molecules.length);
+            } while (gameState.usedMoleculeIndices.includes(randomIndex));
+            
+            gameState.usedMoleculeIndices.push(randomIndex);
+            gameState.currentMoleculeIndex = randomIndex;
+            
+            return molecules[randomIndex];
+        }
+
+        // 显示分子信息
+        function displayMolecule(molecule) {
+            // 重置表单和解析区域
+            elements.answerForm.reset();
+            elements.explanationArea.classList.add('hidden');
+            
+            // 更新分子信息
+            elements.moleculeName.textContent = molecule.name;
+            elements.centralAtomInfo.textContent = molecule.centralAtom;
+            elements.valenceElectrons.textContent = molecule.valenceElectrons;
+            elements.ligandsInfo.textContent = molecule.ligand.symbol;
+            elements.xValue.textContent = molecule.ligandCount;
+            elements.ligandValenceElectrons.textContent = molecule.ligand.valenceElectrons;
+            elements.bValue.textContent = molecule.ligand.electronsContributed;
+            
+            // 显示电荷信息
+            elements.chargeInfo.textContent = molecule.charge === 0 ? "中性" : 
+                                             molecule.charge > 0 ? `+${molecule.charge}` : molecule.charge;
+            
+            // 更新中心原子显示
+            elements.centralAtom.textContent = molecule.centralAtom;
+            
+            // 绘制分子结构
+            drawMoleculeStructure(molecule);
+            
+            // 更新分数显示
+            updateScoreDisplay();
+        }
+
+        // 绘制分子结构示意图
+        function drawMoleculeStructure(molecule) {
+            // 清除之前的配体原子
+            const existingLigands = document.querySelectorAll('.ligand-atom');
+            existingLigands.forEach(ligand => ligand.remove());
+            
+            const numLigands = molecule.ligandCount;
+            let ligandSymbols = [molecule.ligand.symbol];
+            
+            // 处理混合配体的情况（如CH₃Cl）
+            if (molecule.ligand.symbol === "H/Cl") {
+                ligandSymbols = ["H", "H", "H", "Cl"];
+            }
+            
+            const centralAtom = elements.centralAtom;
+            const centerX = centralAtom.offsetLeft + centralAtom.offsetWidth / 2;
+            const centerY = centralAtom.offsetTop + centralAtom.offsetHeight / 2;
+            const radius = 100; // 配体原子与中心原子的距离
+            
+            // 根据价层电子对确定分子构型
+            let angles = [];
+            
+            switch (molecule.valencePairs) {
+                case 2: // 直线形
+                    angles = [0, Math.PI];
+                    break;
+                case 3: // 平面三角形
+                    angles = [0, 2 * Math.PI / 3, 4 * Math.PI / 3];
+                    break;
+                case 4: // 四面体 (简化为平面十字形)
+                    angles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+                    break;
+                default:
+                    // 默认均匀分布
+                    for (let i = 0; i < numLigands; i++) {
+                        angles.push(i * 2 * Math.PI / numLigands);
+                    }
+            }
+            
+            // 创建配体原子
+            for (let i = 0; i < numLigands; i++) {
+                const angle = angles[i % angles.length];
+                const x = centerX + radius * Math.cos(angle) - 20; // 20是配体原子宽度的一半
+                const y = centerY + radius * Math.sin(angle) - 20; // 20是配体原子高度的一半
+                
+                const ligandAtom = document.createElement('div');
+                ligandAtom.className = 'ligand-atom absolute w-10 h-10 rounded-full bg-accent flex items-center justify-center text-white font-bold shadow-md';
+                ligandAtom.style.left = `${x}px`;
+                ligandAtom.style.top = `${y}px`;
+                ligandAtom.textContent = ligandSymbols[i % ligandSymbols.length];
+                
+                // 添加连接线
+                const connector = document.createElement('div');
+                connector.className = 'absolute bg-gray-300 z-0';
+                connector.style.width = `${radius}px`;
+                connector.style.height = '2px';
+                connector.style.left = `${centerX}px`;
+                connector.style.top = `${centerY}px`;
+                connector.style.transformOrigin = '0 50%';
+                connector.style.transform = `rotate(${angle * 180 / Math.PI}deg)`;
+                
+                elements.moleculeStructure.appendChild(connector);
+                elements.moleculeStructure.appendChild(ligandAtom);
+            }
+        }
+
+        // 检查答案
+        function checkAnswers(molecule) {
+            const userAnswers = {
+                lonePairs: parseInt(elements.lonePairsInput.value),
+                valencePairs: parseInt(elements.valencePairsInput.value),
+                vpModel: elements.vpModelInput.value,
+                molecularShape: elements.molecularShapeInput.value,
+                hybridization: elements.hybridizationInput.value
+            };
+            
+            // 计算正确的答案数量
+            let correctCount = 0;
+            if (userAnswers.lonePairs === molecule.lonePairs) correctCount++;
+            if (userAnswers.valencePairs === molecule.valencePairs) correctCount++;
+            if (userAnswers.vpModel === molecule.vpModel) correctCount++;
+            if (userAnswers.molecularShape === molecule.molecularShape) correctCount++;
+            if (userAnswers.hybridization === molecule.hybridization) correctCount++;
+            
+            // 显示相应的反馈
+            elements.correctFeedback.classList.add('hidden');
+            elements.partialFeedback.classList.add('hidden');
+            elements.incorrectFeedback.classList.add('hidden');
+            
+            if (correctCount === 5) {
+                elements.correctFeedback.classList.remove('hidden');
+                gameState.score += 10;
+                gameState.correctAnswers++;
+            } else if (correctCount > 0) {
+                elements.partialFeedback.classList.remove('hidden');
+                elements.partialCorrectCount.textContent = `你答对了 ${correctCount} 个问题`;
+            } else {
+                elements.incorrectFeedback.classList.remove('hidden');
+            }
+            
+            // 显示解析
+            displayExplanation(molecule);
+            elements.explanationArea.classList.remove('hidden');
+            
+            // 更新分数
+            updateScoreDisplay();
+        }
+
+        // 显示答案解析（高中人教版）
+        function displayExplanation(molecule) {
+            // 1. 配体提供电子数(b)计算过程
+            let bCalculation = `配体提供电子数(b) = 8 - 配体原子的价电子数<br>`;
+            
+            // 处理H的特殊情况
+            if (molecule.ligand.symbol === "H") {
+                bCalculation += `对于H原子（特殊处理）: b = 1<br>`;
+            } 
+            // 处理混合配体情况
+            else if (molecule.ligand.symbol === "H/Cl") {
+                bCalculation += `H原子（特殊处理）: b = 1<br>`;
+                bCalculation += `Cl原子: b = 8 - 7 = 1<br>`;
+            } 
+            // 普通情况
+            else {
+                bCalculation += `= 8 - ${molecule.ligand.valenceElectrons}<br>`;
+                bCalculation += `= ${molecule.ligand.electronsContributed}<br>`;
+            }
+            
+            elements.bCalculation.innerHTML = bCalculation;
+            
+            // 2. 计算孤电子对的过程（人教版核心公式）
+            const x = molecule.ligandCount;
+            const b = molecule.ligand.electronsContributed;
+            let chargeText, chargeOperator;
+            
+            if (molecule.charge > 0) {
+                chargeText = `- ${molecule.charge}`;
+                chargeOperator = "-";
+            } else if (molecule.charge < 0) {
+                chargeText = `+ ${Math.abs(molecule.charge)}`;
+                chargeOperator = "+";
+            } else {
+                chargeText = "+ 0";
+                chargeOperator = "";
+            }
+            
+            // 处理混合配体情况（如CH₃Cl）
+            let xbCalculation = `${x}×${b}`;
+            if (molecule.ligand.symbol === "H/Cl") {
+                xbCalculation = "(3×1 + 1×1)";
+            }
+            
+            let lonePairsCalculation = `孤电子对数 = 1/2 × (a - xb ${chargeOperator} 电荷数)<br>`;
+            lonePairsCalculation += `= 1/2 × (${molecule.valenceElectrons} - ${xbCalculation} ${chargeText})<br>`;
+            
+            // 计算实际数值
+            let xbValue = x * b;
+            if (molecule.ligand.symbol === "H/Cl") {
+                xbValue = 4; // 3×1 + 1×1 = 4
+            }
+            
+            const innerValue = molecule.valenceElectrons - xbValue - molecule.charge;
+            lonePairsCalculation += `= 1/2 × (${innerValue})<br>`;
+            lonePairsCalculation += `= ${molecule.lonePairs}`;
+            
+            elements.lonePairsCalculation.innerHTML = lonePairsCalculation;
+            elements.correctLonePairs.textContent = molecule.lonePairs;
+            
+            // 3. 计算价层电子对的过程
+            let valencePairsCalculation = `价层电子对数 = 孤电子对数 + 配体原子数(x)<br>`;
+            valencePairsCalculation += `= ${molecule.lonePairs} + ${x}<br>`;
+            valencePairsCalculation += `= ${molecule.valencePairs}`;
+            
+            elements.valencePairsCalculation.innerHTML = valencePairsCalculation;
+            elements.correctValencePairs.textContent = molecule.valencePairs;
+            
+            // 显示其他正确答案
+            elements.correctVpModel.textContent = molecule.vpModel;
+            elements.correctMolecularShape.textContent = molecule.molecularShape;
+            elements.correctHybridization.textContent = molecule.hybridization;
+        }
+
+        // 显示提示
+        function showHint() {
+            const molecule = molecules[gameState.currentMoleculeIndex];
+            const possibleHints = [
+                `价层电子对为${molecule.valencePairs}`,
+                `杂化方式是${molecule.hybridization}`,
+                `VP模型为${molecule.vpModel}`,
+                `孤电子对数为${molecule.lonePairs}`,
+                `配体提供电子数(b)为${molecule.ligand.electronsContributed}`
+            ];
+            
+            // 随机选择一个提示
+            const randomHint = possibleHints[Math.floor(Math.random() * possibleHints.length)];
+            
+            alert(`提示: ${randomHint}`);
+        }
+
+        // 结束游戏
+        function endGame() {
+            elements.gameArea.classList.add('hidden');
+            elements.gameOver.classList.remove('hidden');
+            
+            elements.finalTotal.textContent = gameState.totalQuestions;
+            elements.finalCorrect.textContent = gameState.correctAnswers;
+            elements.finalScore.textContent = gameState.score;
+        }
+
+        // 事件监听器
+        elements.startBtn.addEventListener('click', () => {
+            elements.instructions.classList.add('hidden');
+            elements.gameArea.classList.remove('hidden');
+            
+            const nextMolecule = getNextMolecule();
+            if (nextMolecule) {
+                displayMolecule(nextMolecule);
+            }
+        });
+
+        elements.restartBtn.addEventListener('click', initGame);
+
+        elements.answerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const currentMolecule = molecules[gameState.currentMoleculeIndex];
+            checkAnswers(currentMolecule);
+        });
+
+        elements.nextBtn.addEventListener('click', () => {
+            const nextMolecule = getNextMolecule();
+            if (nextMolecule) {
+                displayMolecule(nextMolecule);
+            }
+        });
+
+        elements.hintBtn.addEventListener('click', showHint);
+
+        elements.helpBtn.addEventListener('click', () => {
+            elements.helpModal.classList.remove('hidden');
+        });
+
+        elements.closeHelp.addEventListener('click', () => {
+            elements.helpModal.classList.add('hidden');
+        });
+
+        // 点击模态框外部关闭
+        elements.helpModal.addEventListener('click', (e) => {
+            if (e.target === elements.helpModal) {
+                elements.helpModal.classList.add('hidden');
+            }
+        });
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>
